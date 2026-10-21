@@ -4,8 +4,13 @@ import jakarta.validation.Valid;
 import org.chat.supportpilot.Records.ChatReply;
 import org.chat.supportpilot.Records.ChatRequest;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -22,20 +28,25 @@ public class ChatController {
             "if you are unsure or the context does not contain answer offer to connect with a human agent. Also keep the answer short and polite";
 
     private final ChatClient chatClient;
-    public ChatController(ChatClient.Builder builder, ChatMemory chatMemory){
+    public ChatController(ChatClient.Builder builder, ChatMemory chatMemory, VectorStore vec){
         this.chatClient = builder.defaultSystem(p)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                        QuestionAnswerAdvisor.builder(vec).searchRequest(SearchRequest.builder()
+                                .topK(4).similarityThreshold(0.5).build()).build())
                 .build();
     }
 
     @PostMapping("/chat")
     public ChatReply chat(@Valid @RequestBody ChatRequest request){
         String convId = giveId(request);
-        String answer = chatClient.prompt()
+        ChatClientResponse response = chatClient.prompt()
                 .user(request.message())
                 .advisors(a->a.param(ChatMemory.CONVERSATION_ID, convId))
-                .call().content();
-        return new ChatReply(answer,convId);
+                .call()
+                .chatClientResponse();
+        System.out.println("response="+response);
+        String answer = response.chatResponse().getResult().getOutput().getText();
+        return new ChatReply(answer,convId,sourcesOf(response));
     }
 
     @PostMapping(value="/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -49,5 +60,19 @@ public class ChatController {
 
     public String giveId(ChatRequest req){
         return req.conversationId()!=null ? req.conversationId() : UUID.randomUUID().toString();
+    }
+    private List<String> sourcesOf(ChatClientResponse res){
+//        System.out.println("response= "+res);
+        Object docs = res.context().get(QuestionAnswerAdvisor.RETRIEVED_DOCUMENTS);
+        if(!(docs instanceof List<?> list)){
+            return List.of();
+        }
+        return list.stream().filter(Document.class::isInstance)
+                .map(Document.class::cast)
+                .map(d -> d.getMetadata().get("source"))
+                .filter(java.util.Objects::nonNull)
+                .map(Object::toString)
+                .distinct()
+                .toList();
     }
 }

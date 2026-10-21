@@ -1,4 +1,7 @@
 package org.chat.supportpilot.Records;
 
-public record ChatReply(String answer,String conversationId) {
+import java.util.List;
+
+public record ChatReply(String answer, String conversationId,
+List<String> sources) {
 }
