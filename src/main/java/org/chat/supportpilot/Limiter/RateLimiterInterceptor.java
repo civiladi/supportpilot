@@ -17,7 +17,7 @@ public class RateLimiterInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
-        String userId = request.getHeader("userId");
+        String userId = request.getHeader("X-User-Id");
         if(userId == null){
             return true;
         }
