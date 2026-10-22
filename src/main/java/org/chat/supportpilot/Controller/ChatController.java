@@ -54,11 +54,13 @@ public class ChatController {
 //        validUser(userId);/// checking if the userId is valid or not.
         Auth.checkValid(userId);/// checking if the userId is valid or not.
         String convId = giveId(request);
+        /// this is the id corresponding to which conversation will be stored.
+        String memoryId = userId + ":" + convId;
         ChatClientResponse response = chatClient.prompt()
                 .user(request.message())
                 .tools(orderTool,refundTool)
                 .toolContext(Map.of("userId",userId))
-                .advisors(a->a.param(ChatMemory.CONVERSATION_ID, convId))
+                .advisors(a->a.param(ChatMemory.CONVERSATION_ID, memoryId))
                 .call()
                 .chatClientResponse();
         String answer = response.chatResponse().getResult().getOutput().getText();
@@ -70,8 +72,9 @@ public class ChatController {
                                                @RequestHeader("X-User-Id") String userId){
         Auth.checkValid(userId);
         String convId = giveId(req);
+        String memoryId = userId +":"+convId;
         Flux<String> tokens = chatClient.prompt()
-                .user(req.message()).advisors(a->a.param(ChatMemory.CONVERSATION_ID, convId))
+                .user(req.message()).advisors(a->a.param(ChatMemory.CONVERSATION_ID, memoryId))
                 .stream().content();
         return ResponseEntity.ok().header("X-conversation-Id", convId).body(tokens);
     }

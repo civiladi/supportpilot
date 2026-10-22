@@ -1,5 +1,9 @@
 package org.chat.supportpilot.Configurations;
 
+import org.chat.supportpilot.Repository.RedisMemoryRepository;
+import org.chat.supportpilot.Repository.RedisMemoryRespository;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.redis.RedisVectorStore;
@@ -24,4 +28,11 @@ public class RedisConfig {
                 .build();
     }
 
+    @Bean
+    public ChatMemory chatMemory(RedisMemoryRepository repository) {
+        return MessageWindowChatMemory.builder()
+                .chatMemoryRepository(repository)
+                .maxMessages(20)
+                .build();
+    }
 }
