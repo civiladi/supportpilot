@@ -13,7 +13,7 @@ import java.util.List;
 
 @Service
 public class RefundService {
-    private static final int refund_days = 7;
+    private static final int refund_days = 30;
     private final OrderRepository orderRepository;
     private final RefundRequestRepository refund;
 
@@ -51,7 +51,7 @@ public class RefundService {
         }
         RefundRequest request = req.get();
         if(request.getStatus()!=RefundRequest.Status.PENDING){
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund Request is already confirmed");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Refund Request is already confirmed");
         }
         request.confirm();
         return request;

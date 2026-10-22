@@ -29,7 +29,8 @@ public class RefundTool {
             + "Only call this after the customer has given both an order ID and a reason.")
     public String requestRefund(
             @ToolParam(description = "The order ID, like ORD-1001")String orderId,
-            @ToolParam(description = "Short reason the customer gave for the refund") String reason, ToolContext tool){
+            @ToolParam(description = "Short reason the customer gave for the refund") String reason,
+            ToolContext tool){
 
         Object user = tool.getContext().get("userId");
         if(!(user instanceof String userId) || userId.isBlank()){
@@ -47,7 +48,7 @@ public class RefundTool {
         if (cleaned.length() > max_reason) {
             cleaned = cleaned.substring(0, max_reason);
         }
-        log.info("requestRefund called: orderId={}, reason={}", id, userId);
-        return refund.requestRefund(userId, id, cleaned);
+        log.info("requestRefund called: orderId={}, userId={}, reason={} ", id, userId, reason);
+        return refund.requestRefund(id, userId, cleaned);
     }
 }

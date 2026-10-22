@@ -1,9 +1,6 @@
 package org.chat.supportpilot.Entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.Version;
+import jakarta.persistence.*;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -18,7 +15,9 @@ public class RefundRequest {
     private String id;
     private String orderId;
     private String userId;
+    @Column(length = 300)
     private String reason;
+    @Enumerated(EnumType.STRING)
     private Status status;
     private Instant createdAt;
     private Instant decidedAt;
