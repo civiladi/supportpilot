@@ -1,6 +1,7 @@
 package org.chat.supportpilot.Controller;
 
 import jakarta.validation.Valid;
+import org.chat.supportpilot.Auth;
 import org.chat.supportpilot.Records.ChatReply;
 import org.chat.supportpilot.Records.ChatRequest;
 import org.chat.supportpilot.Tools.OrderTool;
@@ -47,7 +48,8 @@ public class ChatController {
     @PostMapping("/chat")
     public ChatReply chat(@Valid @RequestBody ChatRequest request,
                           @RequestHeader("X-User-Id") String userId){
-        validUser(userId);///checking if the userId is valid or not.
+//        validUser(userId);/// checking if the userId is valid or not.
+        Auth.checkValid(userId);/// checking if the userId is valid or not.
         String convId = giveId(request);
         ChatClientResponse response = chatClient.prompt()
                 .user(request.message())
@@ -80,7 +82,6 @@ public class ChatController {
         return req.conversationId()!=null ? req.conversationId() : UUID.randomUUID().toString();
     }
     private List<String> sourcesOf(ChatClientResponse res){
-//        System.out.println("response= "+res);
         Object docs = res.context().get(QuestionAnswerAdvisor.RETRIEVED_DOCUMENTS);
         if(!(docs instanceof List<?> list)){
             return List.of();
