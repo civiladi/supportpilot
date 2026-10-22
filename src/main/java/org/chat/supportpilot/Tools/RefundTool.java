@@ -32,6 +32,8 @@ public class RefundTool {
             @ToolParam(description = "Short reason the customer gave for the refund") String reason,
             ToolContext tool){
 
+        System.out.println(">>> requestRefund WAS CALLED");
+
         if(tool.getContext().get("toolUsed") instanceof java.util.concurrent.atomic.AtomicBoolean used){
             used.set(true);
         }

@@ -29,6 +29,7 @@ public class OrderTool {
             /// This if block tells if the tool is used by the model or not for caching purposes
             used.set(true);
         }
+        System.out.println(">>> getOrderStatus WAS CALLED");
         System.out.println("inside the getOrderStatus tool");
         Object user = tool.getContext().get("userId");
         if(!(user instanceof String userId) || userId.isBlank()){

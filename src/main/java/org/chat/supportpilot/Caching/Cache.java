@@ -68,9 +68,11 @@ public class Cache {
         }
     }
     public void store(String ques, String ans, List<String> sources){
+        log.info(">>> STORING CACHE ENTRY for question: {}", ques);
         try{
             String id = UUID.randomUUID().toString();
             Document d = new Document(id,ques, Map.<String, Object>of("answer", ans, "sources", String.join(",", sources)));
+            log.info("Storing cache entry for question: {}", ques);
             vectorStore.add(List.of(d));
             redisClient.expire("cache:"+id, ttlSeconds);
         }

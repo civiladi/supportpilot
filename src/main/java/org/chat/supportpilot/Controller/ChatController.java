@@ -36,7 +36,8 @@ public class ChatController {
     private static final String p = "You are a customer support assistant. Answer only from provided context, conversation so far, and tool results." +
             " When the customer asks about an order, call the getOrderStatus tool. To start a refund, first make sure you have the order ID and the customer's reason, then call " +
             "the requestRefund tool. A refund is only REQUESTED until the customer confirms it themselves. " +
-            "Never say a refund is approved, completed or processed. Never guess the order details. "+"If you are unsure or the context does not contain answer offer to connect with a human agent. Also keep the answer short and polite";
+            "Never say a refund is approved, completed or processed. Never guess the order details. "+"Only call getOrderStatus tool when the customer asks about the status or details of a specific order." +
+            " Only call requestRefund tool when the customer explicitly wants to initiate or request a refund, and has provided both an order ID and a reason. "+"If you are unsure or the context does not contain answer offer to connect with a human agent. Also keep the answer short and polite";
 
     private final ChatClient chatClient;
     private final OrderTool orderTool;
@@ -76,6 +77,7 @@ public class ChatController {
         }
 
         AtomicBoolean toolUsed = new AtomicBoolean(false);
+        System.out.println("Before AI call, toolUsed = " + toolUsed.get());
         ChatClientResponse response = chatClient.prompt()
                 .user(request.message())
                 .tools(orderTool,refundTool)
@@ -86,7 +88,15 @@ public class ChatController {
         String answer = response.chatResponse().getResult().getOutput().getText();
         List<String> sources = sourcesOf(response);
 
-        if(cacheable && !toolUsed.get() && !sources.isEmpty() && answer!=null && !answer.isBlank()){
+        System.out.println("cacheable = " + cacheable);
+        System.out.println("toolUsed = " + toolUsed.get());
+        System.out.println("sources = " + sources);
+        System.out.println("answer is blank = "
+                + (answer == null || answer.isBlank()));
+
+
+
+        if(cacheable && !toolUsed.get() && !sources.isEmpty() && answer != null && !answer.isBlank()){
             cache.store(question,answer,sources);
         }
         return new ChatReply(answer,convId,sources, false);
