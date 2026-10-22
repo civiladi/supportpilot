@@ -2,6 +2,7 @@ package org.chat.supportpilot.Controller;
 
 import jakarta.validation.Valid;
 import org.chat.supportpilot.Auth;
+import org.chat.supportpilot.Caching.Cache;
 import org.chat.supportpilot.Records.ChatReply;
 import org.chat.supportpilot.Records.ChatRequest;
 import org.chat.supportpilot.Tools.OrderTool;
@@ -11,6 +12,8 @@ import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -24,6 +27,7 @@ import reactor.core.publisher.Flux;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @RestController
 @RequestMapping("/api")
@@ -37,8 +41,10 @@ public class ChatController {
     private final ChatClient chatClient;
     private final OrderTool orderTool;
     private final RefundTool refundTool;
+    private final Cache cache;
+    private final ChatMemory chatMemory;
 
-    public ChatController(ChatClient.Builder builder, ChatMemory chatMemory, VectorStore vec, OrderTool orderTool, RefundTool refundTool){
+    public ChatController(ChatClient.Builder builder, ChatMemory chatMemory, VectorStore vec, OrderTool orderTool, RefundTool refundTool, Cache cache){
         this.chatClient = builder.defaultSystem(p)
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build(),
                         QuestionAnswerAdvisor.builder(vec).searchRequest(SearchRequest.builder()
@@ -46,25 +52,44 @@ public class ChatController {
                 .build();
         this.orderTool = orderTool;
         this.refundTool = refundTool;
+        this.cache=cache;
+        this.chatMemory = chatMemory;
     }
 
     @PostMapping("/chat")
     public ChatReply chat(@Valid @RequestBody ChatRequest request,
                           @RequestHeader("X-User-Id") String userId){
-//        validUser(userId);/// checking if the userId is valid or not.
         Auth.checkValid(userId);/// checking if the userId is valid or not.
         String convId = giveId(request);
         /// this is the id corresponding to which conversation will be stored.
         String memoryId = userId + ":" + convId;
+        String question = request.message();
+
+        boolean cacheable = cache.isCacheable(question) && chatMemory.get(memoryId).isEmpty();
+        if(cacheable){
+            var hit = cache.look(question);
+            if(hit.isPresent()){
+                var cached = hit.get();
+                chatMemory.add(memoryId, List.of(new UserMessage(question),new AssistantMessage(cached.answer())));
+                return new ChatReply(cached.answer(), convId, cached.sources(), true);
+            }
+        }
+
+        AtomicBoolean toolUsed = new AtomicBoolean(false);
         ChatClientResponse response = chatClient.prompt()
                 .user(request.message())
                 .tools(orderTool,refundTool)
-                .toolContext(Map.of("userId",userId))
+                .toolContext(Map.of("userId",userId, "toolUsed",toolUsed))
                 .advisors(a->a.param(ChatMemory.CONVERSATION_ID, memoryId))
                 .call()
                 .chatClientResponse();
         String answer = response.chatResponse().getResult().getOutput().getText();
-        return new ChatReply(answer,convId,sourcesOf(response));
+        List<String> sources = sourcesOf(response);
+
+        if(cacheable && !toolUsed.get() && !sources.isEmpty() && answer!=null && !answer.isBlank()){
+            cache.store(question,answer,sources);
+        }
+        return new ChatReply(answer,convId,sources, false);
     }
 
     @PostMapping(value="/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

@@ -32,6 +32,10 @@ public class RefundTool {
             @ToolParam(description = "Short reason the customer gave for the refund") String reason,
             ToolContext tool){
 
+        if(tool.getContext().get("toolUsed") instanceof java.util.concurrent.atomic.AtomicBoolean used){
+            used.set(true);
+        }
+
         Object user = tool.getContext().get("userId");
         if(!(user instanceof String userId) || userId.isBlank()){
             return "The customer could not be identified";

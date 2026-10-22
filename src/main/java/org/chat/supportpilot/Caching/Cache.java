@@ -67,7 +67,7 @@ public class Cache {
             return Optional.empty();
         }
     }
-    public void score(String ques, String ans, List<String> sources){
+    public void store(String ques, String ans, List<String> sources){
         try{
             String id = UUID.randomUUID().toString();
             Document d = new Document(id,ques, Map.<String, Object>of("answer", ans, "sources", String.join(",", sources)));

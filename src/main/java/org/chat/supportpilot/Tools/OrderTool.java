@@ -25,9 +25,13 @@ public class OrderTool {
     @Tool(description= "Look up the status of one of the current customer's orders "
     +"by order ID, for example ORD-1001. Use this whenever the customer asks about an order.")
     public String getOrderStatus(@ToolParam(description="The order ID, like ORD-1001")String orderId, ToolContext tool){
+        if(tool.getContext().get("toolUsed") instanceof java.util.concurrent.atomic.AtomicBoolean used){
+            /// This if block tells if the tool is used by the model or not for caching purposes
+            used.set(true);
+        }
         System.out.println("inside the getOrderStatus tool");
         Object user = tool.getContext().get("userId");
-        if(!(user instanceof String userId) || userId.isEmpty()){
+        if(!(user instanceof String userId) || userId.isBlank()){
             return "The customer could not be identified.";
         }
         String id = orderId == null ? "":orderId.trim().toUpperCase(Locale.ROOT);
