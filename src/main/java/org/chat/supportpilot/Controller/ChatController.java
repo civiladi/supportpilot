@@ -95,6 +95,7 @@ public class ChatController {
     @PostMapping(value="/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<Flux<String>> stream(@Valid @RequestBody ChatRequest req,
                                                @RequestHeader("X-User-Id") String userId){
+        //To check if the userId is valid or not
         Auth.checkValid(userId);
         String convId = giveId(req);
         String memoryId = userId +":"+convId;
