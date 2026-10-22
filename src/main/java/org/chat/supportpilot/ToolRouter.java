@@ -1,0 +1,74 @@
+package org.chat.supportpilot;
+
+import org.springframework.stereotype.Component;
+
+import java.util.Locale;
+import java.util.regex.Pattern;
+
+@Component
+public class ToolRouter {
+
+    public enum Route {
+        NONE,
+        ORDER_STATUS,
+        REFUND_REQUEST
+    }
+
+    private static final Pattern ORDER_ID =
+            Pattern.compile("\\bORD-\\d{1,10}\\b",
+                    Pattern.CASE_INSENSITIVE);
+
+    public Route route(String message) {
+        String q = message.toLowerCase(Locale.ROOT);
+
+        // 1. Detect an explicit request to initiate a refund.
+        boolean refundIntent =
+                q.contains("request a refund") ||
+                        q.contains("request refund") ||
+                        q.contains("initiate a refund") ||
+                        q.contains("initiate refund") ||
+                        q.contains("i want a refund") ||
+                        q.contains("i'd like a refund") ||
+                        q.contains("i would like a refund") ||
+                        q.contains("please refund") ||
+                        q.contains("refund my order");
+
+        boolean hasOrderId = ORDER_ID.matcher(message).find();
+
+        // A refund tool is available only when the request
+        // is explicit and has an order ID and a stated reason.
+        boolean hasReason =
+                q.contains("because ") ||
+                        q.contains("reason:") ||
+                        q.contains("damaged") ||
+                        q.contains("defective") ||
+                        q.contains("wrong item") ||
+                        q.contains("not received") ||
+                        q.contains("never arrived") ||
+                        q.contains("faulty") ||
+                        q.contains("broken");
+
+        if (refundIntent && hasOrderId && hasReason) {
+            return Route.REFUND_REQUEST;
+        }
+
+        // 2. Detect requests for details/status of a specific order.
+        boolean orderStatusIntent =
+                q.contains("order status") ||
+                        q.contains("track my order") ||
+                        q.contains("track the order") ||
+                        q.contains("where is my order") ||
+                        q.contains("delivery status") ||
+                        q.contains("order details") ||
+                        q.contains("status of my order") ||
+                        q.contains("status of order");
+
+        if (orderStatusIntent && hasOrderId) {
+            return Route.ORDER_STATUS;
+        }
+
+        // 3. Informational questions and incomplete requests
+        // get no tools.
+        return Route.NONE;
+    }
+}

@@ -5,6 +5,7 @@ import org.chat.supportpilot.Auth;
 import org.chat.supportpilot.Caching.Cache;
 import org.chat.supportpilot.Records.ChatReply;
 import org.chat.supportpilot.Records.ChatRequest;
+import org.chat.supportpilot.ToolRouter;
 import org.chat.supportpilot.Tools.OrderTool;
 import org.chat.supportpilot.Tools.RefundTool;
 import org.springframework.ai.chat.client.ChatClient;
@@ -33,19 +34,26 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @RequestMapping("/api")
 public class ChatController {
 
-    private static final String p = "You are a customer support assistant. Answer only from provided context, conversation so far, and tool results." +
-            " When the customer asks about an order, call the getOrderStatus tool. To start a refund, first make sure you have the order ID and the customer's reason, then call " +
-            "the requestRefund tool. A refund is only REQUESTED until the customer confirms it themselves. " +
-            "Never say a refund is approved, completed or processed. Never guess the order details. "+"Only call getOrderStatus tool when the customer asks about the status or details of a specific order." +
-            " Only call requestRefund tool when the customer explicitly wants to initiate or request a refund, and has provided both an order ID and a reason. "+"If you are unsure or the context does not contain answer offer to connect with a human agent. Also keep the answer short and polite";
+//    private static final String p = "You are a customer support assistant. Answer only from provided context, conversation so far, and tool results." +
+//            " When the customer asks about an order, call the getOrderStatus tool. To start a refund, first make sure you have the order ID and the customer's reason, then call " +
+//            "the requestRefund tool. A refund is only REQUESTED until the customer confirms it themselves. " +
+//            "Never say a refund is approved, completed or processed. Never guess the order details. "+"Only call getOrderStatus tool when the customer asks about the status or details of a specific order." +
+//            " Only call requestRefund tool when the customer explicitly wants to initiate or request a refund, and has provided both an order ID and a reason. "+"If you are unsure or the context does not contain answer offer to connect with a human agent. Also keep the answer short and polite";
+    private static final String p="Only call `getOrderStatus` tool when the customer asks about the status or details of a specific order. " +
+        "Only call `requestRefund` tool when the customer explicitly wants to initiate or request a refund, and has provided both an order ID and a reason. " +
+        "All other questions general informational questions, not refund requests or status requests. For these questions, answer using the retrieved document context. Do not call any of the tool. "+
+        "Never invent policy details. If the retrieved context does not contain the answer, say that you don't have enough information and offer to connect the customer with a human agent.";
+
+//    private static final String p="Do not call any of the tools, when the question is about refund policy. Answer only from the retrieved document context. Never invent policy details. If the retrieved context does not contain the answer, say that you don't have enough information and offer to connect the customer with a human agent.";
 
     private final ChatClient chatClient;
     private final OrderTool orderTool;
     private final RefundTool refundTool;
     private final Cache cache;
     private final ChatMemory chatMemory;
+    private final ToolRouter tool;
 
-    public ChatController(ChatClient.Builder builder, ChatMemory chatMemory, VectorStore vec, OrderTool orderTool, RefundTool refundTool, Cache cache){
+    public ChatController(ChatClient.Builder builder, ChatMemory chatMemory, VectorStore vec, OrderTool orderTool, RefundTool refundTool, Cache cache, ToolRouter t){
         this.chatClient = builder.defaultSystem(p)
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build(),
                         QuestionAnswerAdvisor.builder(vec).searchRequest(SearchRequest.builder()
@@ -55,6 +63,7 @@ public class ChatController {
         this.refundTool = refundTool;
         this.cache=cache;
         this.chatMemory = chatMemory;
+        this.tool=t;
     }
 
     @PostMapping("/chat")
@@ -78,13 +87,31 @@ public class ChatController {
 
         AtomicBoolean toolUsed = new AtomicBoolean(false);
         System.out.println("Before AI call, toolUsed = " + toolUsed.get());
-        ChatClientResponse response = chatClient.prompt()
+        ToolRouter.Route route = tool.route(question);
+        var promptSpec = chatClient.prompt()
                 .user(request.message())
-                .tools(orderTool,refundTool)
                 .toolContext(Map.of("userId",userId, "toolUsed",toolUsed))
-                .advisors(a->a.param(ChatMemory.CONVERSATION_ID, memoryId))
-                .call()
-                .chatClientResponse();
+                .advisors(a->a.param(ChatMemory.CONVERSATION_ID, memoryId));
+//        ChatClientResponse response = chatClient.prompt()
+//                .user(request.message())
+//                .tools(orderTool,refundTool)
+//                .toolContext(Map.of("userId",userId, "toolUsed",toolUsed))
+//                .advisors(a->a.param(ChatMemory.CONVERSATION_ID, memoryId))
+//                .call()
+//                .chatClientResponse();
+        switch (route) {
+            case ORDER_STATUS ->
+                    promptSpec = promptSpec.tools(orderTool);
+
+            case REFUND_REQUEST ->
+                    promptSpec = promptSpec.tools(refundTool);
+
+            case NONE -> {
+                // Intentionally expose no tools to the model.
+            }
+        }
+        ChatClientResponse response = promptSpec.call().chatClientResponse();
+
         String answer = response.chatResponse().getResult().getOutput().getText();
         List<String> sources = sourcesOf(response);
 
