@@ -66,7 +66,9 @@ public class ChatController {
     }
 
     @PostMapping(value="/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public ResponseEntity<Flux<String>> stream(@Valid @RequestBody ChatRequest req){
+    public ResponseEntity<Flux<String>> stream(@Valid @RequestBody ChatRequest req,
+                                               @RequestHeader("X-User-Id") String userId){
+        Auth.checkValid(userId);
         String convId = giveId(req);
         Flux<String> tokens = chatClient.prompt()
                 .user(req.message()).advisors(a->a.param(ChatMemory.CONVERSATION_ID, convId))
